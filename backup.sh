@@ -1,27 +1,33 @@
 #!/bin/bash
-echo "Введите путь к исходной директории:"
-read source_dir
 
-if [ ! -d "$source_dir" ]; then
-    echo "Ошибка: Директория '$source_dir' не существует."
+# Параметры
+SOURCE_DIR="./source"
+BACKUP_DIR="./backup"
+REMOTE_USER="ximillian"
+REMOTE_HOST="192.0.0.1"
+REMOTE_DIR="/home/user/Ximillian/Arch"
+
+DATE=$(date +"%Y-%m-%d_%H-%M-%S")
+ARCHIVE_NAME="backup_$DATE.tar.gz"
+
+mkdir -p "$BACKUP_DIR"
+tar -czf "$BACKUP_DIR/$ARCHIVE_NAME" "$SOURCE_DIR"
+echo "Архив создан: $BACKUP_DIR/$ARCHIVE_NAME"
+
+scp "$BACKUP_DIR/$ARCHIVE_NAME" "$REMOTE_USER@$REMOTE_HOST:$REMOTE_DIR"
+if [ $? -eq 0 ]; then
+    echo "Архив  передан в $REMOTE_HOST:$REMOTE_DIR"
+else
+    echo "Ошибка: архив не передан" >&2
     exit 1
 fi
 
-# Запрашиваем директорию назначения
-echo "Введите путь к директории назначения:"
-read target_dir
-
-# Проверяем существование директории назначения, если её нет, создаём
-if [ ! -d "$target_dir" ]; then
-    mkdir -p "$target_dir"
+ssh "$REMOTE_USER@$REMOTE_HOST" "cd $REMOTE_DIR && ls -tp | grep -v '/$' | tail -n +4 | xargs -d '\n' rm --"
+if [ $? -eq 0 ]; then
+    echo "Старые архивы на сервере удалены"
+else
+    echo "Ошибка при удалении" >&2
+    exit 1
 fi
 
-current_date=$(date +%Y-%m-%d)
-
-for file in "$source_dir"/*; do
-    if [ -f "$file" ]; then
-        filename=$(basename "$file") # Извлекаем имя файла
-        cp "$file" "$target_dir/${current_date}_$filename"
-        echo "Скопирован файл: $file -> $target_dir/${current_date}_$filename"
-    fi
-done
+echo "Выполнено"
